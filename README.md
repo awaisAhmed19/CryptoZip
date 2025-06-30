@@ -1,7 +1,4 @@
-
-
-```markdown
-# 🗜️ CryptoZip
+## CryptoZip
 
 CryptoZip is a C++-based data compression and decompression tool that implements the **LZ77 compression algorithm**, optimized with **KMP string matching** to find repeated sequences efficiently. Ideal for compressing large text files with high redundancy.
 
@@ -17,7 +14,7 @@ CryptoZip is a C++-based data compression and decompression tool that implements
 
 ## 📁 Folder Structure
 
-
+```
 Cryptozip/
 ├── .gitignore
 ├── makefile
@@ -30,7 +27,7 @@ Cryptozip/
 │   └── compressor.hpp
 ├── compressed.lz77
 └── bigfile.txt (your input)
-
+```
 
 ## 🛠️ Build Instructions
 
