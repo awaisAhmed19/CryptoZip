@@ -1,0 +1,148 @@
+Restriction on the ensemble code:
+No two messages will consist of identical arrangement of coding digits.
+The message codes will be constructed in such a way that no additional indication is necessary to specify where a message code begins and ends once the starting point of a sequence of messages is known.
+L(1) ≤ L(2) ≤ ... ≤ L(n−1) = L(n)
+At least two and more than D of the messages with the code length L(n) have codes which are alike except for the final digits.
+Each possible sequence of L(n)−1 digits must be used either as a message code or must have one of its prefixes used as a message code.
+
+
+Measuring Information:
+    key properties:
+        - information I(x) and probablity p(x) are inversely related
+        - I(x)>=0 , observing event x never causes a loss of information
+        - the lower the probablility of an event x the higher the information of to the event P(x)=1 then I(x)=0 
+        - P(x n y)= P(x).P(y)=> I(x n y)=I(x) + I(y)
+            I(x)=log_b(1/P(x))= -log_b(P(x))
+
+TODO: Look up (Asymptotic Equipartition Property, Strong typicality) 
+
+
+Requirement:
+The length of the optimum code (minimum redundancy code) can never be greater than the original message code.
+If this requirement is not met, then the reduction of the average message length can be obtained by interchanging the codes for the two messages in question in such a way that the shorter code becomes associated with the more probable message.
+Also, if there are multiple codes with the same probability, then it is possible that the code for these messages may be interchanged in any way without affecting the average code length for the message ensemble.
+So it can be assumed that the messages in the ensemble have been ordered in a fashion such that:
+ p(1) ≥ p(2) ≥ ... ≥ p(n−1) > p(n)
+and in addition, for an optimum code, the condition
+ L(1) ≤ L(2) ≤ ... ≤ L(n−1) ≤ L(n)
+must hold.
+
+Let’s imagine that an ensemble code could assign q more digits to the Nth message than to the (n−1)th message. That must not be used as the code for any other message. Thus, the additional q digits would serve no useful purpose and would unnecessarily increase L(av).
+Therefore, for an optimum code it is necessary that L(n) be equal to L(n−1).
+
+if (p(n−1) > p(n)) {
+    if (L(n−1) > L(n)) {
+        p(n) = L(n−1);
+        p(n−1) = L(n);
+    }
+}
+The kth prefix of a message code is defined as the first k digits of the message code.
+This must not be a prefix to any other code in the message list (or any of its prefixes are used elsewhere as a message code).
+
+Additional requirement for an optimum code:
+Assume there exists a combination of the D different types of coding digits which is less than L(n) digits in length and which is not used as a message code or which is not a prefix of a message code.
+Then this combination of digits could be used to replace the code for the Nth message with a consequent reduction of L(av).
+
+In simple terms:
+If there exists a binary code (say, like 010) that:
+Is shorter than the code you’re using for the least probable message (mₙ)
+Is not currently used as any message code
+Is not a prefix of any existing code
+Then you could use that code instead for the mₙ message → and that would shrink the average code length → meaning your current code wasn't really optimal to begin with.
+
+Original idea:
+To find a distinct optimum code for the Nth message, we could traverse through the binary codes already generated for all the messages in the list and append the digit that corresponds to the ith row and ith column of the message list's optimum code.
+We can flip the bit to make sure that sequence is not repeated.
+That way, I think we will get an original and distinct code.
+Stop when a threshold is reached for the L(av) to be maintained.
+
+Where this proposed idea can work:
+Let’s say we are compressing in a memory-constrained system (microcontroller or real-time telemetry).
+We can predefine the first 100 symbol codes from common data.
+Occasionally, we get a rare 101st symbol we don’t want to waste space on.
+
+Another original idea:
+When we create the compression for all of this, we probably will have a hashmap or something for the correlation between code and its message.
+To apply the security aspect to this, we can do something like: suppose the code is the key of the map and the message is the item to that key.
+We can encrypt the message for secure sharing.
+
+
+2. Hybrid Encryption (What Real Systems Do)
+RSA is slow for big data, so most real systems (like SSL/TLS, OpenPGP, HTTPS) do this trick:
+Generate a random symmetric key (like AES key)
+Encrypt the compressed file using AES
+Encrypt the AES key using RSA (with receiver’s public key)
+Send both:
+
+[RSA_Encrypted_AES_Key] + [AES_Encrypted_Compressed_File]
+On the receiver's side:
+Decrypt AES key using RSA
+Use AES key to decrypt the file
+
+✅ Fast
+✅ Secure
+✅ You still only need RSA for the key
+
+Restriction (c) makes it necessart that the two least probable messages have codes of the equal length. Restriction (d) places the requirement that fr D eqauls to two there be only two of the messages with coded length L(n) which are identicalexecot fir their lasr digits the fina digits if the two codes will be one of the two binary digits 0 and 1 it will be necessary to assign these two messages codes to the Nth and the N-1th messages since at this point it is not known whether or not other codes of length L(n) exist. when this has been done those two messages are equalivant to a single compiste messagen
+Simple Terms:
+You're describing the core recursive logic of Huffman encoding.
+You take the two least probable symbols, assign them to sibling leaves (ending in 0 and 1)
+Then merge them into one composite node
+That composite now becomes a new symbol in the remaining pool, with its probability = p(n-1) + p(n)
+This merging continues until the tree is built
+
+examining the table of probablility, the left hand column contains the ordered messages  probablilities of the ensemble to be coded. N is equak to 13. since each combination of two messages is accompanies bu the assiging of a new digit to each then the total number of digits which should assined to each original message is the same sa the number of combinations indicated for the messages. for example the message marked* or a composite of which it is part is combined with others five times and therefore should be assined a code length of five digits
+
+Each time two messages or composites are merged, they become part of a new node.
+Every time your message (or a composite that includes it) gets merged, it’s pushed one level deeper in the tree.
+
+So:
+
+The number of times your message participates in a merge
+= the length of its final Huffman code
+= the number of bits it takes to represent it
+
+💡 Example (Simplified):
+Let’s say you have:
+
+Symbol	Probability
+A	0.05
+B	0.06
+C	0.07
+...	...
+M	0.20
+
+You run Huffman encoding:
+
+You merge A + B → new composite AB
+Then AB + C → ABC
+Then ABC + D → ABCD
+
+...
+
+Now say A was involved in 5 merges to climb up the tree.
+That means:
+To get from the root to leaf A, you need to make 5 binary choices
+(left or right → 0 or 1)
+So A gets a Huffman code that’s 5 bits long
+
+
+Markovs partition:
+A markovs paprtition is a way to chop up the state space of a choitic dynamical system into non overlapping reagion such that the systems dynamic can be described by the markovs process
+
+markov property
+the system transitions from one chunk to another in a way that only depends on the current chunk not how it got here
+
+Imagine you’re observing a chaotic bouncing ball in a box. You draw lines to divide the box into zones A, B, and C.
+Now you observe:
+If the ball is in A, it might jump to B or C.
+From B, maybe only to A or C.
+If the bouncing obeys certain rules, and the way it transitions depends only on where it is now, not how it got there—then your partition is a Markov partition.
+Each region corresponds to a state, and the movement is modeled by a transition matrix—just like a Markov chain.
+
+helps in:
+✅ Converts complex chaos into simple sequences
+✅ Lets you use probabilistic tools (Markov chains, entropy, etc.)
+✅ Essential for symbolic dynamics, information theory, compression, ergodic theory, and even cryptography
+
+

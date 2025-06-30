@@ -1,0 +1,17 @@
+
+# Ignore build files
+*.o
+*.out
+*.a
+*.so
+*.exe
+*.bin
+*.lz77
+main
+compressed.*
+decompressed.*
+
+# Editor/OS files
+*~
+*.swp
+.DS_Store

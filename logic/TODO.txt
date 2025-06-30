@@ -1,0 +1,120 @@
+reference: https://web.archive.org/web/20230605075029/http://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art001
+https://web.archive.org/web/20230519110814/https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art001
+Algorithm tasks for DEFLATE
+
+
+
+Phase 1 – Huffman Coding Process (Encoding)
+
+1. Read the Input File
+   Load the file and extract its full content as a sequence of characters.
+
+2. Build Frequency Table
+
+   * Traverse all characters and collect the unique ones.
+   * Use a fixed-size array (typically of size 256 for extended ASCII) to count how many times each character occurs.
+   * Sum all frequencies to get the total number of characters.
+
+3. Calculate Probability Table
+
+   * For each character, compute its probability by dividing its frequency by the total character count.
+   * Store each character along with its frequency and computed probability.
+
+4. Sort by Probability
+
+   * Sort the characters in ascending order based on their probability.
+   * This forms the basis for building the Huffman tree.
+
+5. Construct Min Heap and Build Huffman Tree
+
+   * Treat each character as a node with a weight equal to its frequency.
+   * Insert all nodes into a min-heap (priority queue).
+   * Repeat the following steps until the heap contains only one node:
+
+     * Remove the two nodes with the smallest frequency.
+     * Create a new internal node with these two as children. Its frequency is the sum of the two nodes.
+     * Insert the new node back into the heap.
+   * The final node left in the heap becomes the root of the Huffman tree.
+
+---
+
+Understanding Huffman Decoding Logic
+
+To decode a Huffman-encoded bitstream:
+
+1. Start at the root of the Huffman tree.
+2. Read one bit at a time:
+
+   * If the bit is `0`, move to the left child.
+   * If the bit is `1`, move to the right child.
+3. Continue until a leaf node is reached — this corresponds to an actual character.
+4. Output the character.
+5. Reset back to the root and repeat the process with the next bits.
+
+This traversal ensures that variable-length Huffman codes are properly interpreted without needing delimiters.
+
+---
+
+LZ77 Compression (Encoding Logic)
+
+Concept: LZ77 uses a sliding window, composed of:
+
+* Search Buffer: Holds previously seen characters (past context).
+* Lookahead Buffer: Holds upcoming characters (future context).
+
+Encoding Algorithm:
+
+
+while input is not empty:
+    match = longest repeated sequence in search buffer that matches the beginning of the lookahead buffer
+    if match exists:
+        distance = position of match start in search buffer
+        length = length of the match
+        next_char = the character immediately after the match
+    else:
+        distance = 0
+        length = 0
+        next_char = first character of lookahead buffer
+    emit (distance, length, next_char)
+    slide window forward by (length + 1) characters
+
+
+---
+
+Compression Algorithm Families – General Purpose
+
+* Huffman Coding
+  Variable-length prefix encoding based on symbol frequencies. Often used after other algorithms.
+
+* Lempel–Ziv Algorithms (Dictionary-Based)
+
+  * LZ77: Uses a sliding window and emits (distance, length, character). Basis for Deflate.
+  * LZ78: Builds a dictionary of repeated sequences.
+  * LZSS: A refinement of LZ77; improves compression by handling literals and matches more efficiently.
+  * LZW: Dictionary-based encoding used in GIFs and Unix compress.
+
+* Burrows–Wheeler Transform (BWT)
+  Reversible transform that rearranges input to be more compressible. Often paired with RLE and Huffman.
+
+* Run-Length Encoding (RLE)
+  Represents sequences of repeated characters as (value, count). Effective on data with many long runs.
+
+* Arithmetic Coding
+  Replaces sequences with a fractional number in the interval \[0,1). High compression potential, often used for text.
+
+* Prediction by Partial Matching (PPM)
+  Uses context modeling to predict next symbols based on previous ones. Effective for text, but memory-intensive.
+
+* Deflate
+  Combines LZ77 for sequence matching and Huffman coding for entropy compression. Used in formats like ZIP, PNG, and gzip.
+
+* **LZMA (Lempel–Ziv–Markov Chain Algorithm)**
+  High compression ratio using dictionary and range encoding. Basis of `.7z` and `.xz` formats.
+
+* **Zstandard (zstd)**
+  Modern, fast compression combining LZ and entropy encoding. Supports optional **ANS (Asymmetric Numeral Systems)** instead of Huffman/Arithmetic.
+
+---
+
+Let me know if you want a step-by-step breakdown of how to implement Huffman or LZ77 in C-style data structures next.
+
