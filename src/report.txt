@@ -1,0 +1,72 @@
+(aes.c)
+
+The structure & flow
+expandKey handles key expansion like a boss, using core with Rcon and rotation.
+
+aes_encrypt handles layout rearrangement (column-major to row-major and back), does key expansion on the fly, and calls aes_main.
+
+aes_main does the full AES process: initial AddRoundKey, 9/11/13 normal rounds, and final round without MixColumns.
+
+You got your inverse functions started (invSubBytes, invShiftRows, invShiftRow), but no invMixColumns or full decrypt flow shown here — probably elsewhere or incomplete?
+
+2. About the MixColumn function
+Your mixColumn is on point with Galois multiplication by constants 2, 3, 1, 1, etc. but remember:
+
+The order and multiplication constants are super important — for AES correctness, it must strictly follow the standard matrix.
+
+The galois_multiplication looks clean and efficient, using bit shifts and xor for GF(2^8) multiplication.
+
+3. Key Expansion details
+You correctly handle 128, 192, and 256-bit key sizes.
+
+Special S-Box substitution for 256-bit keys at halfway through the key size (currentSize % size == 16) is there, nice!
+
+core rotates, applies S-Box, then XORs with Rcon. Perfect.
+
+4. Performance & Memory
+Dynamic malloc for expanded keys is okay but beware of memory leaks — you free properly in aes_encrypt, good!
+
+You might wanna cache expanded keys if encrypting multiple blocks with the same key. Re-expanding every time is slow.
+
+5. Code style suggestions
+In createRoundKey you do this:
+
+c
+Copy
+Edit
+for (i = 0; i < 4; i++) {
+    for (j = 0; j < 4; j++) 
+        roundKey[(i + (j * 4))] = expandedKey[(i * 4) + j];
+}
+It’s a bit funky; you’re transposing the 4x4 block from expandedKey into roundKey. Be sure this matches the state layout. AES states are usually column-major, so this is crucial. You do the reverse during block copying in aes_encrypt. Just double-check that the indexing matches.
+
+6. Decryption missing parts?
+You have invSubBytes, invShiftRows, invShiftRow defined here, but the code for invMixColumns, aes_invRound, aes_invMain, and full aes_decrypt function is missing. Those are essential for decryption.
+
+If you want, I can help you fill in those gaps. Decrypting AES is basically the encryption steps backwards, with inverse operations and round key application order reversed.
+
+7. General advice:
+AES is a beast, but your implementation shows you’ve got the foundations down.
+
+Always test your implementation against known test vectors from NIST to make sure your encryption/decryption pairs work flawlessly.
+
+Consider adding padding and block chaining modes (CBC, CTR) later for real-world use. Right now, it looks like ECB (single block).
+A couple of things to double-check or consider:
+
+invMixColumn() Galois multiplication factors
+Those magic numbers 14, 9, 13, 11 are correct for AES inverse MixColumns — that’s perfect. Just make sure your galois_multiplication() is bug-free (which from what I saw earlier, it is).
+
+Memory Safety
+You malloc expandedKey and free it — great! Just be sure the caller handles the error codes properly.
+
+Edge Cases & Validation
+Your aes_decrypt() returns error codes if the key size is unknown or malloc fails — nice defensive programming!
+
+Performance
+This is a basic implementation, so no fancy lookup tables or optimizations — totally cool for learning or small use cases.
+
+Style
+Some minor nitpicks: sometimes you have braces {} on single-line loops, sometimes not. Consistency is your friend, but that’s just me being picky.
+
+Testing
+If you haven’t already, do run your full encrypt-then-decrypt cycle with known test vectors (AES test vectors are everywhere online) to be 100% sure the implementation is rock solid.

@@ -24,8 +24,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+// #include <unitstd.h>
 
+#include <sys/wait.h>  // for wait()
+#include <unistd.h>    // for fork(), execv()
+
+#include "aes.h"
 #include "bitio.h"
+#include "debug.h"
 #include "getopt.h"
 #include "lz77.h"
 
@@ -54,120 +60,234 @@ typedef enum { ENCODE, DECODE } MODES;
  *          -h: help
  ***************************************************************************/
 int main(int argc, char *argv[]) {
-  /* variables */
-  int opt;
-  FILE *file = NULL;
-  struct bitFILE *bitF = NULL;
-  MODES mode = -1;
-  char *filenameIn = NULL, *filenameOut = NULL;
-  int la_size = -1, sb_size = -1; /* default size */
+    int opt;
+    FILE *file = NULL;
+    FILE *intermediate = NULL;
+    struct bitFILE *bitF = NULL;
+    MODES mode = -1;
+    char *filenameIn = NULL, *filenameOut = NULL;
+    int la_size = 15, sb_size = 4095;
+    int doEncrypt = 0, doDecrypt = 0;
+    char *aesKeyStr = NULL;
+    unsigned char aesKey[16] = {0};
 
-  while ((opt = getopt(argc, argv, "cdi:o:l:s:h")) != -1) {
-    switch (opt) {
-    case 'c': /* compression mode */
-      mode = ENCODE;
-      break;
+    int runTests = 0;
+    fprintf(stderr, "[INIT] Parsing command-line args...\n");
 
-    case 'd': /* decompression mode */
-      mode = DECODE;
-      break;
+    while ((opt = getopt(argc, argv, "cdi:o:l:s:EDk:ht")) != -1) {
+        switch (opt) {
+            case 't':
+                runTests = 1;
+                break;
+            case 'c':
+                mode = ENCODE;
+                break;
+            case 'd':
+                mode = DECODE;
+                break;
+            case 'i':
+                filenameIn = strdup(optarg);
+                break;
+            case 'o':
+                filenameOut = strdup(optarg);
+                break;
+            case 'l':
+                la_size = atoi(optarg);
+                break;
+            case 's':
+                sb_size = atoi(optarg);
+                break;
+            case 'E':
+                doEncrypt = 1;
+                break;
+            case 'D':
+                doDecrypt = 1;
+                break;
+            case 'k':
+                aesKeyStr = strdup(optarg);
+                ASSERT(aesKeyStr != NULL);
+                memset(aesKey, 0, 16);
+                size_t keylen = strlen(aesKeyStr);
+                if (keylen > 16) keylen = 16;
+                memcpy(aesKey, aesKeyStr, keylen);
+                break;
+            case 'h':
+            default:
+                printf("Usage: ...\n");
+                exit(EXIT_SUCCESS);
+        }
+    }
 
-    case 'i': /* input file name */
-      if (filenameIn != NULL) {
-        fprintf(stderr, "Multiple input files not allowed.\n");
+    if (runTests) {
+        fprintf(stderr, "[TEST] Running round-trip compression/encryption test...\n");
+
+        // 1. Compress + Encrypt
+        char *encOut = "test_output_encrypted.lz77";
+        char *decOut = "test_output_decrypted.txt";
+
+        char *compressCmd[] = {argv[0], "-c",       "-E", "-k",   aesKeyStr,
+                               "-i",    filenameIn, "-o", encOut, NULL};
+
+        fprintf(stderr, "[TEST] Compressing and encrypting '%s' to '%s'\n", filenameIn, encOut);
+
+        if (fork() == 0) {
+            execv(argv[0], compressCmd);
+            perror("[TEST] execv compressCmd failed");
+            exit(1);
+        }
+
+        wait(NULL);
+
+        // 2. Decrypt + Decompress
+        char *decompressCmd[] = {argv[0], "-d",   "-D", "-k",   aesKeyStr,
+                                 "-i",    encOut, "-o", decOut, NULL};
+
+        fprintf(stderr, "[TEST] Decrypting and decompressing '%s' to '%s'\n", encOut, decOut);
+
+        if (fork() == 0) {
+            execv(argv[0], decompressCmd);
+            perror("[TEST] execv decompressCmd failed");
+            exit(1);
+        }
+
+        wait(NULL);
+
+        // 3. Compare
+        char cmpCmd[512];
+        snprintf(cmpCmd, sizeof(cmpCmd), "diff -q %s %s", filenameIn, decOut);
+        int cmp = system(cmpCmd);
+        if (cmp == 0)
+            fprintf(stderr, "[TEST] ✅ Round-trip test passed! Files match.\n");
+        else
+            fprintf(stderr, "[TEST] ❌ Round-trip test FAILED. Files differ!\n");
+
+        free(aesKeyStr);
+        free(filenameIn);
+        free(filenameOut);
+        exit(0);
+    }
+    // Check must-have args
+    ASSERT(filenameIn != NULL);
+    ASSERT(filenameOut != NULL);
+    ASSERT(mode == ENCODE || mode == DECODE);
+    ASSERT(la_size >= MIN_LA_SIZE && la_size <= MAX_LA_SIZE);
+    ASSERT(sb_size >= MIN_SB_SIZE && sb_size <= MAX_SB_SIZE);
+
+    if ((doEncrypt || doDecrypt)) {
+        ASSERT(aesKeyStr != NULL);
+        ASSERT(strlen((char *)aesKey) > 0);
+    }
+
+    if (mode == ENCODE) {
+        fprintf(stderr, "[ENCODE] Opening input file: %s\n", filenameIn);
+        file = fopen(filenameIn, "rb");
+        ASSERT(file != NULL);
+
+        intermediate = tmpfile();
+        ASSERT(intermediate != NULL);
+
+        fprintf(stderr, "[ENCODE] Compressing...\n");
+        bitF = bitIO_open(intermediate, BIT_IO_W);
+        ASSERT(bitF != NULL);
+        ASSERT(bitF->mode == BIT_IO_W);
+
+        encode(file, bitF, la_size, sb_size);
+        fprintf(stderr, "[ENCODE] Compression done.\n");
+
+        bitIO_close(bitF);
+        fclose(file);
+        rewind(intermediate);
+        fseek(intermediate, 0, SEEK_END);
+        long size = ftell(intermediate);
+        fseek(intermediate, 0, SEEK_SET);  // rewind again
+        fprintf(stderr, "[DEBUG] Intermediate file size: %ld bytes\n", size);
+        FILE *outFile = fopen(filenameOut, "wb");
+        ASSERT(outFile != NULL);
+
+        if (doEncrypt) {
+            fprintf(stderr, "[ENCODE] Encrypting data to output file...\n");
+            unsigned char inBlock[16] = {0}, outBlock[16];
+            size_t read;
+            while ((read = fread(inBlock, 1, 16, intermediate)) > 0) {
+                ASSERT(read <= 16);
+                if (read < 16) memset(inBlock + read, 0, 16 - read);
+                aes_encrypt(inBlock, outBlock, aesKey, SIZE_16);
+                fwrite(outBlock, 1, 16, outFile);
+            }
+        } else {
+            fprintf(stderr, "[ENCODE] Writing raw compressed data to output file...\n");
+            char buf[1024];
+            size_t read;
+            while ((read = fread(buf, 1, sizeof(buf), intermediate)) > 0) {
+                fwrite(buf, 1, read, outFile);
+            }
+        }
+
+        fclose(outFile);
+        fprintf(stderr, "[ENCODE] Done.\n");
+
+    } else if (mode == DECODE) {
+        fprintf(stderr, "[DECODE] Preparing intermediate file...\n");
+        intermediate = tmpfile();
+        ASSERT(intermediate != NULL);
+
+        file = fopen(filenameIn, "rb");
+        ASSERT(file != NULL);
+
+        if (doDecrypt) {
+            fprintf(stderr, "[DECODE] Decrypting input file...\n");
+            unsigned char inBlock[16], outBlock[16];
+            size_t read;
+            while ((read = fread(inBlock, 1, 16, file)) > 0) {
+                ASSERT(read <= 16);
+                aes_decrypt(inBlock, outBlock, aesKey, SIZE_16);
+                fwrite(outBlock, 1, 16, intermediate);
+            }
+        } else {
+            fprintf(stderr, "[DECODE] Copying input file as-is to intermediate...\n");
+            char buf[1024];
+            size_t read;
+            while ((read = fread(buf, 1, sizeof(buf), file)) > 0) {
+                fwrite(buf, 1, read, intermediate);
+            }
+        }
+
+        fclose(file);
+        rewind(intermediate);
+        fseek(intermediate, 0, SEEK_END);
+        long size = ftell(intermediate);
+        fseek(intermediate, 0, SEEK_SET);  // rewind again
+        fprintf(stderr, "[DEBUG] Intermediate file size: %ld bytes\n", size);
+        file = fopen(filenameOut, "wb");
+        ASSERT(file != NULL);
+
+        bitF = bitIO_open(intermediate, BIT_IO_R);
+        ASSERT(bitF != NULL);
+        ASSERT(bitF->mode == BIT_IO_R);
+
+        fprintf(stderr, "[DECODE] Starting decompression...\n");
+        decode(bitF, file);
+        bitIO_close(bitF);
+        fclose(file);
+        fprintf(stderr, "[DECODE] Done.\n");
+
+    } else {
+        fprintf(stderr, "[ERROR] Must specify encode (-c) or decode (-d)\n");
         goto error;
-      }
-      filenameIn = malloc(strlen(optarg) + 1);
-      strcpy(filenameIn, optarg);
-
-      break;
-
-    case 'o': /* output file name */
-      if (filenameOut != NULL) {
-        fprintf(stderr, "Multiple output files not allowed.\n");
-        goto error;
-      }
-      filenameOut = malloc(strlen(optarg) + 1);
-      strcpy(filenameOut, optarg);
-
-      break;
-
-    case 'l': /* lookahead size */
-      la_size = atoi(optarg);
-      if (la_size < MIN_LA_SIZE || la_size > MAX_LA_SIZE) {
-        fprintf(stderr, "Bad lookahead size value.\n");
-        goto error;
-      }
-      break;
-
-    case 's': /* search-buffer size */
-      sb_size = atoi(optarg);
-      if (sb_size < MIN_SB_SIZE || sb_size > MAX_SB_SIZE) {
-        fprintf(stderr, "Bad search-buffer size value.\n");
-        goto error;
-      }
-      break;
-
-    case 'h': /* help */
-      printf("Usage: lz77 <options>\n");
-      printf("  -c : Encode input file to output file.\n");
-      printf("  -d : Decode input file to output file.\n");
-      printf("  -i <filename> : Name of input file.\n");
-      printf("  -o <filename> : Name of output file.\n");
-      printf("  -l <value> : Lookahead size (default 15)\n");
-      printf("  -s <value> : Search-buffer size (default 4095)\n");
-      printf("  -h : Command line options.\n\n");
-      break;
     }
-  }
 
-  /* validate command line */
-  if (filenameIn == NULL) {
-    fprintf(stderr, "Input file must be provided\n");
-    goto error;
-  } else if (filenameOut == NULL) {
-    fprintf(stderr, "Output file must be provided\n");
-    goto error;
-  }
+    free(filenameIn);
+    free(filenameOut);
+    free(aesKeyStr);
+    return 0;
 
-  if (mode == ENCODE) {
-    if ((file = fopen(filenameIn, "rb")) == NULL) {
-      perror("Opening input file");
-      goto error;
-    }
-    if ((bitF = bitIO_open(filenameOut, BIT_IO_W)) == NULL) {
-      perror("Opening output file");
-      goto error;
-    }
-    encode(file, bitF, la_size, sb_size);
-
-  } else if (mode == DECODE) {
-    if ((bitF = bitIO_open(filenameIn, BIT_IO_R)) == NULL) {
-      perror("Opening input file");
-      goto error;
-    }
-    if ((file = fopen(filenameOut, "w")) == NULL) {
-      perror("Opening output file");
-      goto error;
-    }
-    decode(bitF, file);
-
-  } else {
-    fprintf(stderr, "Select ENCODE or DECODE mode\n");
-    goto error;
-  }
-
-  fclose(file);
-  bitIO_close(bitF);
-  return 0;
-
-  /* handle error */
 error:
-  if (file != NULL) {
-    fclose(file);
-  }
-  if (bitF != NULL) {
-    bitIO_close(bitF);
-  }
-  exit(EXIT_FAILURE);
+    fprintf(stderr, "[FATAL] Aborting with error.\n");
+    if (file) fclose(file);
+    if (intermediate) fclose(intermediate);
+    if (bitF) bitIO_close(bitF);
+    if (filenameIn) free(filenameIn);
+    if (filenameOut) free(filenameOut);
+    if (aesKeyStr) free(aesKeyStr);
+    return 1;
 }

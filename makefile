@@ -1,32 +1,35 @@
+
+# Compiler & flags
 CC = gcc
-CFLAGS = -Wall -Werror -O2
-OBJDIR = build
+CFLAGS = -Wall -Werror -O2 -g
+
+# Directories
 SRCDIR = src
+OBJDIR = build
 
-OBJS = $(OBJDIR)/main.o $(OBJDIR)/lz77.o $(OBJDIR)/tree.o $(OBJDIR)/bitio.o
+# Source files
+SOURCES = main.c lz77.c tree.c bitio.c aes.c
 
-all: lz77
+# Object files
+OBJS = $(patsubst %.c, $(OBJDIR)/%.o, $(notdir $(SOURCES)))
 
-lz77: $(OBJS)
+# Output binary
+TARGET = lz77
+
+# Default rule
+all: $(TARGET)
+
+# Linking rule
+$(TARGET): $(OBJS)
 	$(CC) -o $@ $(OBJS) -lm
 
-$(OBJDIR)/main.o: $(SRCDIR)/main.c $(SRCDIR)/bitio.h $(SRCDIR)/lz77.h
+# Generic rule for building object files
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJDIR)/lz77.o: $(SRCDIR)/lz77.c $(SRCDIR)/bitio.h $(SRCDIR)/tree.h
-	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/tree.o: $(SRCDIR)/tree.c $(SRCDIR)/tree.h
-	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/bitio.o: $(SRCDIR)/bitio.c $(SRCDIR)/bitio.h
-	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
+# Clean rule
 .PHONY: clean
-
 clean:
-	rm -rf $(OBJDIR) lz77
+	rm -rf $(OBJDIR) $(TARGET)
+
