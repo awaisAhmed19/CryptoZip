@@ -4,15 +4,15 @@ CryptoZip is a C++-based data compression and decompression tool that implements
 
 ## 🔧 Features
 
-- 🔁 **LZ77 Compression**
-- ⚡ **Efficient pattern matching** using the Knuth-Morris-Pratt (KMP) algorithm
-- 💾 Binary file output with `<distance, length, nextChar>` tuples
-- 🔄 Decompression engine to restore the original file
-- 📊 Shows compression ratio and time taken
-- 🧠 Modular code (separated into `src/` and `logic/` directories)
-- 🚀 Written entirely in modern C++
+- **LZ77 Compression**
+- **Efficient pattern matching** using the Knuth-Morris-Pratt (KMP) algorithm
+- Binary file output with `<distance, length, nextChar>` tuples
+- Decompression engine to restore the original file
+- Shows compression ratio and time taken
+- Modular code (separated into `src/` and `logic/` directories)
+- Written entirely in modern C++
 
-## 📁 Folder Structure
+## Folder Structure
 
 ```
 Cryptozip/
@@ -29,7 +29,7 @@ Cryptozip/
 └── bigfile.txt (your input)
 ```
 
-## 🛠️ Build Instructions
+## Build Instructions 
 
 You need a C++ compiler (like `g++`) and Make.
 
@@ -41,9 +41,9 @@ make
 
 This will generate the `main` executable.
 
-## 🚀 Usage
+##  Usage
 
-### 📦 Compression
+### Compression
 
 ```bash
 ./main
@@ -55,17 +55,17 @@ By default, this:
 * Writes compressed data to `compressed.lz77`
 * Logs compression stats
 
-### 🔓 Decompression
+###  Decompression
 
 Add the decompression function call inside `main.cpp`:
 
 ```cpp
-decompressLZ77("compressed.lz77", "decompressed.txt");
+decompressLZ77("compressed.lz77", "decompressed.txt"); 
 ```
 
-Then recompile and run to restore the original file.
+After this, recompile and run to restore the original file.
 
-## 📊 Compression Stats Example
+## Compression Stats Example
 
 ```bash
 Original Size:     235838 bytes
@@ -74,22 +74,19 @@ Compression Ratio: 0.649
 Time Taken:        320 ms
 ```
 
-*Stats vary depending on file redundancy and window size.*
+*Stats vary depending on file redundancy and window size.* 
 
-## 🔮 Future Plans
+##  Future Plans
 
-* 🧩 Add Huffman encoding for nextChar
-* 🔒 Integrate simple XOR encryption
-* 📦 Build `.czip` custom file format
-* 🌐 Web-based UI using WebAssembly (long shot, but cool)
+*  Add Huffman encoding for nextChar
+*  Integrate simple XOR encryption
+*  Build `.czip` custom file format
+*  Web-based UI using WebAssembly (long shot, but cool) 
 
-## 🤝 Contributions
+## Contributions 
 
-Feel free to open issues or submit pull requests. Ideas, optimizations, and feedback welcome.
+Feel free to open issues or submit pull requests. Ideas, optimizations, and feedback welcome. 
 
-## 🧠 Credits
+## Credits 
 
-Made with ✨, sweat, and C++ by [@awaisAhmed19](https://github.com/awaisAhmed19)
-
-
-```
+Made with ✨, sweat, and C++ by [@awaisAhmed19](https://github.com/awaisAhmed19). 
